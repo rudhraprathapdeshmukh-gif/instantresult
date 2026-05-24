@@ -8,24 +8,33 @@ let browser, page;
 
 // 🚀 START BROWSER
 async function startBrowser() {
-  browser = await puppeteer.launch({
-    headless: "new",
-    args: [
-      "--no-sandbox",
-      "--disable-setuid-sandbox",
-      "--disable-dev-shm-usage",
-      "--disable-gpu"
-    ]
-  });
+browser = await puppeteer.launch({
+  headless: "new",
+  args: [
+    "--no-sandbox",
+    "--disable-setuid-sandbox",
+    "--disable-dev-shm-usage",
+    "--disable-gpu"
+  ]
+});
 
-  page = await browser.newPage();
-  await page.setViewport({ width: 1366, height: 768 });
+page = await browser.newPage();
 
-  await page.goto(
-    "https://www.polycet.sbtet.telangana.gov.in/#!/index/GetRankCard",
-    { waitUntil: "networkidle2" }
-  );
+page.setDefaultNavigationTimeout(60000);
 
+await page.goto(
+  "https://www.polycet.sbtet.telangana.gov.in/",
+  { waitUntil: "domcontentloaded" }
+);
+
+await page.waitForTimeout(3000);
+
+await page.goto(
+  "https://www.polycet.sbtet.telangana.gov.in/#!/index/GetRankCard",
+  { waitUntil: "domcontentloaded" }
+);
+
+await page.waitForTimeout(3000);
   console.log("✅ Browser started");
 }
 
