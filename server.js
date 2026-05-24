@@ -1,43 +1,44 @@
 const express = require("express");
 const puppeteer = require("puppeteer");
-
-browser = await puppeteer.launch({
-  headless: "new",
-  args: [
-    "--no-sandbox",
-    "--disable-setuid-sandbox",
-    "--disable-dev-shm-usage",
-    "--disable-gpu"
-  ]
-});
 const path = require("path");
 
 const app = express();
 
+let browser, page;
+
+// 🚀 START BROWSER (ONLY ONCE)
+async function startBrowser() {
+  try {
+    browser = await puppeteer.launch({
+      headless: true,
+      args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu"
+      ]
+    });
+
+    page = await browser.newPage();
+
+    await page.setViewport({ width: 1280, height: 800 });
+
+    await page.goto(
+      "https://www.polycet.sbtet.telangana.gov.in/#!/index/GetRankCard",
+      { waitUntil: "networkidle2" }
+    );
+
+    console.log("✅ Browser started");
+  } catch (err) {
+    console.log("❌ Browser start error:", err);
+  }
+}
+
+// 🔥 CALL ONLY ONCE
+startBrowser();
+
 app.use(express.json());
 app.use(express.static("public"));
-
-let browser;
-let page;
-
-// 🚀 START BROWSER
-(async () => {
-browser = await puppeteer.launch({
-  headless: "new",
-  args: [
-    "--no-sandbox",
-    "--disable-setuid-sandbox"
-  ]
-});
-
-  page = await browser.newPage();
-  await page.setViewport({ width: 1280, height: 800 });
-  await page.goto(
-    "https://www.polycet.sbtet.telangana.gov.in/#!/index/GetRankCard",
-    { waitUntil: "networkidle2" }
-  );
-})();
-
 
 // HOME
 app.get("/", (req, res) => {
@@ -45,17 +46,14 @@ app.get("/", (req, res) => {
 });
 
 
-// 🔥 CAPTCHA (FIXED REFRESH)
+// 🔥 CAPTCHA
 app.get("/captcha", async (req, res) => {
   try {
-
-    // 🔥 RELOAD PAGE (THIS IS THE REAL FIX)
     await page.goto(
       "https://www.polycet.sbtet.telangana.gov.in/#!/index/GetRankCard",
       { waitUntil: "networkidle2" }
     );
 
-    // 🔥 WAIT FOR CAPTCHA TO LOAD
     await page.waitForSelector("img", { timeout: 10000 });
 
     await new Promise(r => setTimeout(r, 1500));
@@ -68,12 +66,10 @@ app.get("/captcha", async (req, res) => {
       try {
         const box = await img.boundingBox();
 
-        // 👉 captcha size filter (correct)
         if (box && box.width > 120 && box.width < 200 && box.height < 80) {
           target = img;
           break;
         }
-
       } catch {}
     }
 
@@ -93,7 +89,7 @@ app.get("/captcha", async (req, res) => {
 });
 
 
-// 🔥 RESULT (FULLY FIXED)
+// 🔥 RESULT
 app.post("/result", async (req, res) => {
   const { hallticket, captcha } = req.body;
 
@@ -104,16 +100,12 @@ app.post("/result", async (req, res) => {
   try {
     let alertMessage = null;
 
-    // 🔥 bring page to front
     await page.bringToFront();
 
-    // 🔥 wait for inputs (FIX FOR NULL ERROR)
     await page.waitForSelector("input[ng-model='HallTicketNumber']", { timeout: 10000 });
     await page.waitForSelector("input[placeholder='Enter Captcha']", { timeout: 10000 });
 
-    await new Promise(r => setTimeout(r, 500));
-
-    // 🔥 handle alert
+    // 🔥 HANDLE ALERT
     const dialogHandler = async (dialog) => {
       try {
         alertMessage = dialog.message();
@@ -123,7 +115,7 @@ app.post("/result", async (req, res) => {
 
     page.on("dialog", dialogHandler);
 
-    // 🔥 clear inputs safely
+    // 🔥 CLEAR INPUTS
     await page.evaluate(() => {
       const ht = document.querySelector("input[ng-model='HallTicketNumber']");
       const cap = document.querySelector("input[placeholder='Enter Captcha']");
@@ -132,11 +124,11 @@ app.post("/result", async (req, res) => {
       if (cap) cap.value = "";
     });
 
-    // 🔥 type values
+    // 🔥 TYPE VALUES
     await page.type("input[ng-model='HallTicketNumber']", hallticket);
     await page.type("input[placeholder='Enter Captcha']", captcha);
 
-    // 🔥 submit
+    // 🔥 SUBMIT
     await page.evaluate(() => {
       const btn = [...document.querySelectorAll("button")]
         .find(b => b.innerText.includes("Submit"));
@@ -224,6 +216,5 @@ app.post("/result", async (req, res) => {
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-  
-  console.log("Server running on port " + PORT);
+  console.log("🚀 Server running on port " + PORT);
 });
