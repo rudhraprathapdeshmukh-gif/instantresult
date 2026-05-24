@@ -54,30 +54,17 @@ app.get("/captcha", async (req, res) => {
       { waitUntil: "networkidle2" }
     );
 
-    await page.waitForSelector("img", { timeout: 10000 });
+    // 🔥 WAIT LONGER (IMPORTANT FOR RAILWAY)
+    await new Promise(r => setTimeout(r, 3000));
 
-    await new Promise(r => setTimeout(r, 1500));
+    // 🔥 TARGET ONLY CAPTCHA IMAGE (NOT ALL IMAGES)
+    const captcha = await page.$("img[alt='Captcha']");
 
-    const images = await page.$$("img");
-
-    let target = null;
-
-    for (let img of images) {
-      try {
-        const box = await img.boundingBox();
-
-        if (box && box.width > 120 && box.width < 200 && box.height < 80) {
-          target = img;
-          break;
-        }
-      } catch {}
-    }
-
-    if (!target) {
+    if (!captcha) {
       return res.json({ message: "Captcha not found ❌" });
     }
 
-    const buffer = await target.screenshot();
+    const buffer = await captcha.screenshot();
 
     res.set("Content-Type", "image/png");
     res.send(buffer);
