@@ -1,5 +1,15 @@
 const express = require("express");
 const puppeteer = require("puppeteer");
+
+browser = await puppeteer.launch({
+  headless: "new",
+  args: [
+    "--no-sandbox",
+    "--disable-setuid-sandbox",
+    "--disable-dev-shm-usage",
+    "--disable-gpu"
+  ]
+});
 const path = require("path");
 
 const app = express();
@@ -21,7 +31,7 @@ browser = await puppeteer.launch({
 });
 
   page = await browser.newPage();
-
+  await page.setViewport({ width: 1280, height: 800 });
   await page.goto(
     "https://www.polycet.sbtet.telangana.gov.in/#!/index/GetRankCard",
     { waitUntil: "networkidle2" }
@@ -214,5 +224,6 @@ app.post("/result", async (req, res) => {
 const PORT = process.env.PORT || 3000;
 
 app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  
+  console.log("Server running on port " + PORT);
 });
