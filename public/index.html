@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>POLYCET Results</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: 'Segoe UI', sans-serif;
+  background: linear-gradient(135deg, #0f172a, #1e293b);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+}
+
+.container {
+  width: 100%;
+  max-width: 420px;
+  padding: 15px;
+}
+
+.card {
+  background: #111827;
+  padding: 22px;
+  border-radius: 14px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+}
+
+h2 {
+  text-align: center;
+  margin-bottom: 18px;
+  color: #e5e7eb;
+  font-weight: 600;
+}
+
+/* INPUT */
+input {
+  width: 100%;
+  padding: 12px;
+  margin: 8px 0;
+  border-radius: 8px;
+  border: 1px solid #374151;
+  background: #1f2933;
+  color: #e5e7eb;
+  font-size: 14px;
+  transition: 0.2s;
+}
+
+input::placeholder {
+  color: #9ca3af;
+}
+
+input:focus {
+  border-color: #38bdf8;
+  outline: none;
+}
+
+/* CAPTCHA */
+.captcha-box {
+  text-align: center;
+  margin: 12px 0;
+}
+
+.captcha-box img {
+  width: 150px;
+  border-radius: 6px;
+  border: 1px solid #374151;
+}
+
+/* BUTTONS */
+.buttons {
+  display: flex;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+button {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: 0.2s;
+}
+
+.refresh {
+  background: #374151;
+  color: #e5e7eb;
+}
+
+.check {
+  background: #0ea5e9;
+  color: white;
+}
+
+button:hover {
+  opacity: 0.9;
+}
+
+/* STATUS */
+#status {
+  text-align: center;
+  margin-top: 10px;
+  font-size: 13px;
+  color: #9ca3af;
+}
+
+/* RESULT */
+.result {
+  margin-top: 15px;
+  background: #1f2933;
+  padding: 12px;
+  border-radius: 10px;
+  color: #e5e7eb;
+}
+
+/* DETAILS */
+.details p {
+  margin: 4px 0;
+  font-size: 13px;
+}
+
+.details span {
+  font-weight: 600;
+}
+
+/* TABLE */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+  font-size: 12px;
+}
+
+th, td {
+  border: 1px solid #374151;
+  padding: 6px;
+  text-align: center;
+}
+
+th {
+  background: #0ea5e9;
+  color: white;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+  <div class="card">
+
+    <h2>🎓 POLYCET Results</h2>
+
+    <div class="input-group">
+      <input id="hallticket" placeholder="Enter Hall Ticket">
+    </div>
+
+    <div class="captcha-box">
+      <img id="captchaImg" src="/captcha" alt="Captcha">
+    </div>
+
+    <div class="input-group">
+      <input id="captcha" placeholder="Enter Captcha">
+    </div>
+
+    <div class="buttons">
+      <button class="refresh" onclick="loadCaptcha()">Refresh</button>
+      <button class="check" onclick="getResult()">Check Result</button>
+    </div>
+
+    <div id="status"></div>
+    <div id="result" class="result"></div>
+
+  </div>
+</div>
+
+<script>
+
+// 🔥 LOAD CAPTCHA
+async function loadCaptcha(){
+  const btn = document.querySelector(".refresh");
+  const img = document.getElementById("captchaImg");
+
+  btn.disabled = true;
+  img.style.opacity = 0.5;
+
+  img.src = "/captcha?ts=" + Date.now();
+
+  setTimeout(() => {
+    btn.disabled = false;
+    img.style.opacity = 1;
+  }, 2000);
+}
+
+// 🔥 FETCH RESULT
+async function getResult(){
+
+  const status = document.getElementById("status");
+  const result = document.getElementById("result");
+
+  status.innerHTML = `<div class="loader"></div> Fetching result...`;
+  result.innerHTML = "";
+
+  try {
+    const res = await fetch("/result",{
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({
+        hallticket:hallticket.value,
+        captcha:captcha.value
+      })
+    });
+
+    const data = await res.json();
+
+    status.innerHTML = "";
+
+    // ❌ ERROR
+    if(!data.data){
+      result.innerHTML = `<p style="color:red;">❌ ${data.message}</p>`;
+      loadCaptcha();
+      captcha.value="";
+      return;
+    }
+
+    const r = data.data;
+
+    // ✅ SUCCESS UI
+    result.innerHTML = `
+      <div class="details">
+        <p><span>Hall Ticket:</span> ${r.hallticket}</p>
+        <p><span>Name:</span> ${r.name}</p>
+        <p><span>Father's Name:</span> ${r.father}</p>
+        <p><span>Date:</span> ${r.date}</p>
+      </div>
+
+      <table>
+        <tr>
+          <th>Stream</th>
+          <th>M</th>
+          <th>P</th>
+          <th>C</th>
+          <th>B</th>
+          <th>Total</th>
+          <th>Rank</th>
+        </tr>
+        ${r.marks.map(m=>`
+          <tr>
+            <td>${m.stream}</td>
+            <td>${m.maths}</td>
+            <td>${m.physics}</td>
+            <td>${m.chemistry}</td>
+            <td>${m.biology}</td>
+            <td>${m.total}</td>
+            <td>${m.rank}</td>
+          </tr>
+        `).join("")}
+      </table>
+    `;
+
+  } catch (e) {
+    status.innerHTML = "";
+    result.innerHTML = `<p style="color:red;">❌ Network error</p>`;
+  }
+}
+
+</script>
+
+</body>
+</html>
