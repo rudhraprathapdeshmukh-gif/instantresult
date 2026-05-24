@@ -1,7 +1,7 @@
 {
   "name": "polycet-scraper",
   "version": "1.0.0",
-  "description": "POLYCET result scraper app",
+  "description": "POLYCET Result Scraper",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
@@ -12,7 +12,7 @@
   "dependencies": {
     "express": "^4.22.2",
     "mongoose": "^9.6.2",
-    "puppeteer-core": "^25.0.4",
+    "puppeteer": "^25.0.4",
     "sharp": "^0.34.5"
   }
 }
