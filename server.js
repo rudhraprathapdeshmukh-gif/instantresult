@@ -6,36 +6,39 @@ const app = express();
 
 let browser, page;
 
-// 🚀 START BROWSER
+// 🚀 START BROWSER (LOAD ONLY ONCE)
 async function startBrowser() {
-browser = await puppeteer.launch({
-  headless: "new",
-  args: [
-    "--no-sandbox",
-    "--disable-setuid-sandbox",
-    "--disable-dev-shm-usage",
-    "--disable-gpu"
-  ]
-});
+  browser = await puppeteer.launch({
+    headless: "new",
+    args: [
+      "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-dev-shm-usage",
+      "--disable-gpu"
+    ]
+  });
 
-page = await browser.newPage();
+  page = await browser.newPage();
 
-page.setDefaultNavigationTimeout(60000);
+  await page.setViewport({ width: 1366, height: 768 });
 
-await page.goto(
-  "https://www.polycet.sbtet.telangana.gov.in/",
-  { waitUntil: "domcontentloaded" }
-);
+  // 🔥 LOAD BASE SITE FIRST
+  await page.goto(
+    "https://www.polycet.sbtet.telangana.gov.in/",
+    { waitUntil: "domcontentloaded" }
+  );
 
-await page.waitForTimeout(3000);
+  await page.waitForTimeout(4000);
 
-await page.goto(
-  "https://www.polycet.sbtet.telangana.gov.in/#!/index/GetRankCard",
-  { waitUntil: "domcontentloaded" }
-);
+  // 🔥 THEN LOAD ACTUAL PAGE
+  await page.goto(
+    "https://www.polycet.sbtet.telangana.gov.in/#!/index/GetRankCard",
+    { waitUntil: "domcontentloaded" }
+  );
 
-await page.waitForTimeout(3000);
-  console.log("✅ Browser started");
+  await page.waitForTimeout(4000);
+
+  console.log("✅ Browser ready");
 }
 
 startBrowser();
@@ -50,61 +53,29 @@ app.get("/", (req, res) => {
 });
 
 
-// 🔥 CAPTCHA (HYBRID METHOD)
+// 🔥 CAPTCHA (FINAL FIX - NO RELOAD)
 app.get("/captcha", async (req, res) => {
   try {
-    await page.goto(
-      "https://www.polycet.sbtet.telangana.gov.in/#!/index/GetRankCard",
-      { waitUntil: "networkidle2" }
-    );
+    await page.bringToFront();
 
-    // 🔥 WAIT MORE (IMPORTANT)
-    await new Promise(r => setTimeout(r, 3000));
+    // 🔥 CLICK REFRESH BUTTON (IMPORTANT)
+    await page.evaluate(() => {
+      const refreshBtn = document.querySelector("button[ng-click]");
+      if (refreshBtn) refreshBtn.click();
+    });
 
-    // =========================
-    // 🔴 METHOD 1: OLD (FAST)
-    // =========================
-    const images = await page.$$("img");
+    // wait for new captcha render
+    await new Promise(r => setTimeout(r, 2000));
 
-    let target = null;
-
-    for (let img of images) {
-      try {
-        const box = await img.boundingBox();
-
-        if (
-          box &&
-          box.width > 120 &&
-          box.width < 200 &&
-          box.height > 30 &&
-          box.height < 100
-        ) {
-          target = img;
-          break;
-        }
-      } catch {}
-    }
-
-    // ✅ IF FOUND → RETURN
-    if (target) {
-      const buffer = await target.screenshot();
-      res.set("Content-Type", "image/png");
-      return res.send(buffer);
-    }
-
-    // =========================
-    // 🔥 METHOD 2: BACKUP (CROP)
-    // =========================
-    console.log("Using fallback crop method...");
-
-    const clipArea = {
-      x: 670,
-      y: 450,
-      width: 130,
-      height: 60
-    };
-
-    const captchaImage = await page.screenshot({ clip: clipArea });
+    // 🔥 FINAL PERFECT CLIP (YOUR TUNED VALUES)
+    const captchaImage = await page.screenshot({
+      clip: {
+        x: 460,
+        y: 420,
+        width: 180,
+        height: 70
+      }
+    });
 
     res.set("Content-Type", "image/png");
     res.send(captchaImage);
@@ -116,7 +87,7 @@ app.get("/captcha", async (req, res) => {
 });
 
 
-// 🔥 RESULT
+// 🔥 RESULT (UNCHANGED + STABLE)
 app.post("/result", async (req, res) => {
   const { hallticket, captcha } = req.body;
 
@@ -129,10 +100,9 @@ app.post("/result", async (req, res) => {
 
     await page.bringToFront();
 
-    await page.waitForSelector("input[ng-model='HallTicketNumber']", { timeout: 10000 });
-    await page.waitForSelector("input[placeholder='Enter Captcha']", { timeout: 10000 });
+    await page.waitForSelector("input[ng-model='HallTicketNumber']");
+    await page.waitForSelector("input[placeholder='Enter Captcha']");
 
-    // 🔥 HANDLE ALERT
     const dialogHandler = async (dialog) => {
       alertMessage = dialog.message();
       await dialog.dismiss();
@@ -140,7 +110,7 @@ app.post("/result", async (req, res) => {
 
     page.on("dialog", dialogHandler);
 
-    // CLEAR INPUTS
+    // CLEAR
     await page.evaluate(() => {
       const ht = document.querySelector("input[ng-model='HallTicketNumber']");
       const cap = document.querySelector("input[placeholder='Enter Captcha']");
@@ -148,11 +118,11 @@ app.post("/result", async (req, res) => {
       if (cap) cap.value = "";
     });
 
-    // TYPE VALUES
+    // TYPE
     await page.type("input[ng-model='HallTicketNumber']", hallticket);
     await page.type("input[placeholder='Enter Captcha']", captcha);
 
-    // CLICK SUBMIT
+    // SUBMIT
     await page.evaluate(() => {
       const btn = [...document.querySelectorAll("button")]
         .find(b => b.innerText.includes("Submit"));
@@ -163,7 +133,7 @@ app.post("/result", async (req, res) => {
 
     page.off("dialog", dialogHandler);
 
-    // HANDLE ERRORS
+    // ERRORS
     if (alertMessage) {
       if (alertMessage.toLowerCase().includes("captcha")) {
         return res.json({ message: "Invalid Captcha ❌" });
@@ -174,8 +144,8 @@ app.post("/result", async (req, res) => {
       return res.json({ message: alertMessage });
     }
 
-    // GET RESULT
-    await page.waitForSelector("table", { timeout: 10000 });
+    // RESULT
+    await page.waitForSelector("table");
 
     const data = await page.evaluate(() => {
       const container = [...document.querySelectorAll("div")]
@@ -225,11 +195,11 @@ app.post("/result", async (req, res) => {
       return res.json({ message: "Failed to fetch result ❌" });
     }
 
-    return res.json({ data });
+    res.json({ data });
 
   } catch (err) {
     console.log("Error:", err);
-    return res.json({ message: "Try again ❌" });
+    res.json({ message: "Try again ❌" });
   }
 });
 
